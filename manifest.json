@@ -7,5 +7,6 @@
     "author": "Mikhail Paulyshka",
     "email": "me@mixaill.tk",
     "url": "https://github.com/Mixaill/galaxy-integration-gw2",
-    "script": "plugin.py"
+    "script": "plugin.py",
+    "update_url": "https://raw.githubusercontent.com/FriendsOfGalaxy/galaxy-integration-gw2/master/current_version.json"
 }
