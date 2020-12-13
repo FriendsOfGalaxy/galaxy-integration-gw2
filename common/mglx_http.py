@@ -1,6 +1,7 @@
 # (c) 2019-2020 Mikhail Paulyshka
 # SPDX-License-Identifier: MIT
 
+import asyncio
 import collections
 import logging
 import ssl
@@ -37,25 +38,45 @@ class MglxHttp:
 
 
     async def request(self, method: str, url: str, *, params: Any = None, data: Any = None, json: Any = None):
-        response_status = 202
+        response_status = None
         response_text = None
 
         if 'Referer' in self.__session_headers:
             self.__session_headers.pop('Referer')
     
         while True:
-            async with self.__session.request(method, url, headers = self.__session_headers, params = params, data = data, json = json) as response:
-                response_text = await response.text()
-                response_status = response.status
-                if response_status == 202 and 'Location' in response.headers:
-                    url = response.headers['Location']
-                    self.__session_headers.update({'Referer': str(response.url)})
-                    method = 'GET'
-                else:
-                    break
+            try:
+                async with self.__session.request(method, url, headers = self.__session_headers, params = params, data = data, json = json) as response:
+                    response_text = await response.text()
+                    response_status = response.status
+                    if response_status == 202 and 'Location' in response.headers:
+                        url = response.headers['Location']
+                        self.__session_headers.update({'Referer': str(response.url)})
+                        method = 'GET'
+                    else:
+                        break
+            except aiohttp.ClientConnectionError:
+                self.__logger.warn('request: [%s]%s --> aiohttp.ClientConnectionError' % (method, url))
+                response_status = 0
+                break
+            except asyncio.CancelledError:
+                self.__logger.warn('request: [%s]%s --> asyncio.CancelledError' % (method, url))
+                response_status = 499 #499 Client Closed Request
+                break
+            except asyncio.TimeoutError:
+                self.__logger.warn('request: [%s]%s --> asyncio.TimeoutError' % (method, url))
+                response_status = 408 #408 Request Timeout
+                break
+            except RuntimeError:
+                self.__logger.warn('request: [%s]%s --> RuntimeError' % (method, url))
+                response_status = 0
+                break
+            except TimeoutError:
+                self.__logger.warn('request: [%s]%s --> TimeoutError' % (method, url))
+                response_status = 408 #408 Request Timeout
+                break
 
         return collections.namedtuple('MglxHttpResponse', ['status', 'text'])(response_status, response_text)
-
 
     async def request_get(self, url: str, params: Any = None) -> Any:
         return await self.request('GET', url, params = params)
